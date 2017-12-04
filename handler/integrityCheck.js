@@ -80,6 +80,9 @@ function scanErrors(event, parm, list = [], resolve, reject) {
         res.Items.forEach(i => {
             util.logMessage('item =>' + JSON.stringify(i));
             let filename = getFilename(event, i);
+
+            if (!filename) return reject({ status: '#FILENAME_NOTFOUND', message: 'Check your configured keys for this table.' })
+
             util.logMessage('FILENAME ==> ' + JSON.stringify(filename));
 
             promises.push(searchObjectsToBackup(CONFIG.bucket, `${event.table.name}/${filename}`, i))
@@ -146,6 +149,8 @@ function putObjects(event) {
 
             let filename = getFilename(event, obj);
 
+            if (!filename) return reject({ status: '#FILENAME_NOTFOUND', message: 'Note: Check your configured keys for this table.' })
+
             util.putObject({
                 Bucket: CONFIG.bucket,
                 Key: `${event.table.name}/${filename}`,
@@ -155,13 +160,13 @@ function putObjects(event) {
                     util.logMessage('PUT SUCCESS ==>' + JSON.stringify(obj));
                     count--;
                     countSuccess++;
-                    if (count == 0) return resolve({listErrors, countSuccess});
+                    if (count == 0) return resolve({ listErrors, countSuccess });
                 })
                 .catch(err => {
                     util.logMessage('FAILED TO PUT ==>' + JSON.stringify(obj));
                     listErrors.push(obj);
                     count--;
-                    if (count == 0) return resolve({listErrors, countSuccess});
+                    if (count == 0) return resolve({ listErrors, countSuccess });
                 })
         })
     })
@@ -188,15 +193,26 @@ function getFilename(event, obj) {
     if (_.isObject(obj)) {
         let filename;
         let key;
-        let keys = Object.keys(obj);
 
-        if (_.size(event.table.keys) === 1) {
+        if (!_.get(CONFIG, `tables.${event.table.name}`)) return null;
+
+        let configKeys = _.get(CONFIG, `tables.${event.table.name}`);
+
+        util.logMessage('CONFIG KEYS ==>' + JSON.stringify(configKeys));
+        util.logMessage('EVENT KEYS ==> ' + JSON.stringify(event.table.keys));
+
+        if (_.size(configKeys) === 1) {
+            if (event.table.keys[0].AttributeName !== configKeys.key) return null;
+
             key = event.table.keys[0].AttributeName;
             filename = obj[key];
+
         } else {
-            let key1 = event.table.keys[0].AttributeName;
-            let key2 = event.table.keys[1].AttributeName;
-            filename = `${obj[key1]}||${obj[key2]}`
+            let values = [event.table.keys[0].AttributeName, event.table.keys[1].AttributeName];
+
+            if (!_.isEqual(values, _.values(configKeys))) return null;
+
+            filename = `${obj[configKeys.key]}||${obj[configKeys.sortKey]}`
         }
 
         filename = filename.replace(/[^a-z0-9 | . _ - @]/gi, '-');

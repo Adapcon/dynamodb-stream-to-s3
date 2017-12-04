@@ -47,15 +47,35 @@ function getRecords(event) {
       record.dynamodb.Keys = [record.dynamodb.Keys]
       record.dynamodb.Keys = record.dynamodb.Keys.map(unmarshalItem)[0];
 
-      if (_.size(record.dynamodb.Keys) === 1) filename = _.values(record.dynamodb.Keys)[0];
-      else {
-        let values = _.values(record.dynamodb.Keys);
-        filename = `${values[0]}||${values[1]}`;
-      }
-      util.logMessage('FILENAME => ' + filename);
+      if (_.get(CONFIG, `tables.${event.table}`)) {
+        let configKeys = _.get(CONFIG, `tables.${event.table}`);
+        let streamKeys = _.keys(record.dynamodb.Keys);
+
+        util.logMessage('KEYS => ' + JSON.stringify(configKeys));
+        util.logMessage('STREAM KEYS => ' + JSON.stringify(streamKeys));
+        
+        if (_.size(configKeys) === 2) {
+          let key = configKeys.key;
+          let sortKey = configKeys.sortKey;
+
+          if (_.isEqual(streamKeys, _.values(configKeys))) {
+            filename = `${record.dynamodb.Keys[key]}||${record.dynamodb.Keys[sortKey]}`;
+          } else return reject({ status: '#KEYS_DOESNT_MATCH' })
+
+        } else {
+          if (_.isEqual(streamKeys, _.values(configKeys))) {
+            let key = configKeys.key;
+            filename = record.dynamodb.Keys[key];
+          } else return reject({ status: '#KEYS_DOESNT_MATCH' })
+
+        }
+      } else return reject({ status: '#KEYS_NOT_FOUND' })
+
       util.logMessage('EVENTNAME => ' + record.eventName);
 
       filename = filename.replace(/[^a-z0-9 | . _ - @]/gi, '-');
+
+      util.logMessage('FILENAME => ' + filename);
 
       if (record.eventName == 'REMOVE' && filename) {
         event.objects.push({
@@ -112,6 +132,7 @@ function setRecords(event) {
           })
           .catch(err => {
             util.logMessage('FAILED TO REMOVE ==>' + JSON.stringify(record))
+            console.log('ERROR ==>', err);
             count--;
             if (count == 0) return resolve();
           })
