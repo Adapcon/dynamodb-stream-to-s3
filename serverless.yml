@@ -1,0 +1,26 @@
+service: dynamodb-stream-to-s3
+
+provider:
+  name: aws
+  stage: core
+  runtime: nodejs6.10
+  region: ${file(./config.json):region}
+  memorySize: ${file(./config.json):memorySize}
+  timeout: ${file(./config.json):timeout}
+
+functions:
+  integrityCheck:
+    handler: /handler/integrityCheck.run
+    events:
+      - http:
+          path: integrityCheck
+          method: post
+          integration: lambda
+          cors: true
+
+  backupTrigger:
+    handler: /handler/trigger.run
+    events: ${file(./config.json):streams}
+
+plugins:
+  - serverless-offline
