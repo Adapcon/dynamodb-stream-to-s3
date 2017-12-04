@@ -210,7 +210,7 @@ function getFilename(event, obj) {
         } else {
             let values = [event.table.keys[0].AttributeName, event.table.keys[1].AttributeName];
 
-            if (!_.isEqual(values, _.values(configKeys))) return null;
+            if (!_.isEqual(values.sort(), _.values(configKeys).sort())) return null;
 
             filename = `${obj[configKeys.key]}||${obj[configKeys.sortKey]}`
         }

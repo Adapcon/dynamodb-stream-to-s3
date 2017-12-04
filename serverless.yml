@@ -1,4 +1,4 @@
-service: dynamodb-stream-to-s3
+service: adapcon-dynamodb-stream-to-s3
 
 provider:
   name: aws

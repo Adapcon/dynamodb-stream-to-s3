@@ -58,15 +58,19 @@ function getRecords(event) {
           let key = configKeys.key;
           let sortKey = configKeys.sortKey;
 
-          if (_.isEqual(streamKeys, _.values(configKeys))) {
+          if (_.isEqual(streamKeys.sort(), _.values(configKeys).sort())) {
             filename = `${record.dynamodb.Keys[key]}||${record.dynamodb.Keys[sortKey]}`;
-          } else return reject({ status: '#KEYS_DOESNT_MATCH' })
+          } else {
+            return reject({ status: '#KEYS_DOESNT_MATCH' })
+          }
 
         } else {
-          if (_.isEqual(streamKeys, _.values(configKeys))) {
+          if (_.isEqual(streamKeys.sort(), _.values(configKeys).sort())) {
             let key = configKeys.key;
             filename = record.dynamodb.Keys[key];
-          } else return reject({ status: '#KEYS_DOESNT_MATCH' })
+          } else {
+            return reject({ status: '#KEYS_DOESNT_MATCH' })
+          }
 
         }
       } else return reject({ status: '#KEYS_NOT_FOUND' })
