@@ -6,43 +6,53 @@ const dbClient = require('../utils/Aws.js').dbClient();
 const db = require('../utils/Aws.js').db();
 const util = require('../utils/Util.js');
 
-module.exports.run = (event, context, callback) => {
-    util.logMessage('------INTEGRITY CHECK STARTED------')
-    util.logMessage('--------------EVENT----------------')
-    util.logMessage(JSON.stringify(event))
+let logString = '';
 
-    if (event.body.execute) event.execute = true;
-    else event.execute = false;
+let event = {};
+event.table = process.argv[2];
+event.execute = process.argv[3];
+
+execute((res) => {
+    util.logMessage('', logString, 1)
+    util.logMessage(res.message, logString, 1)
+})
+
+function execute(callback) {
+    util.logMessage('', logString, 1)
+    util.logMessage('INTEGRITY CHECK STARTED', logString, 1)
 
     util.checkArgs([{
-        var: event.body.table,
-        status: '#TABLE_NOTFOUND',
-        message: 'A Tabela do Dynamo não foi informada!'
-    }])
+            var: event.table,
+            status: '#TABLE_NOTFOUND',
+            message: 'A Tabela do Dynamo não foi informada!'
+        }])
         .then(() => getTableSchema(event))
         .then(() => getInvalidObjects(event))
         .then(() => putObjects(event))
         .then(res => endRequest(res, event))
-        .then(() => callback(null, {
-            status: 200
+        .then(() => callback({
+            status: 'ok',
+            message: 'INTEGRITY CHECK FINISHED'
         }))
         .catch(err => {
-            util.sendResultErro(err, callback)
+            callback(err)
         })
 }
 
 function getTableSchema(event) {
     return new Promise((resolve, reject) => {
         db.describeTable({
-            TableName: event.body.table
+            TableName: event.table
         }, (err, data) => {
-            if (err) return reject(err, err.stack);
+            if (err) return reject({
+                status: "error",
+                message: 'Table not found!'
+            });
             else {
                 event.table = {};
                 event.table.name = data.Table.TableName;
                 event.table.keys = data.Table.KeySchema;
                 event.table.itemCount = data.Table.ItemCount;
-                util.logMessage('TABLE INFO ==> ' + JSON.stringify(event.table));
                 return resolve();
             }
         })
@@ -52,9 +62,9 @@ function getTableSchema(event) {
 function getInvalidObjects(event) {
     return new Promise((resolve, reject) => {
         scan('errors', event, {
-            TableName: event.table.name,
-            Limit: 100
-        })
+                TableName: event.table.name,
+                Limit: 100
+            })
             .then(res => {
                 event.objects = res;
                 return resolve();
@@ -78,12 +88,14 @@ function scanErrors(event, parm, list = [], resolve, reject) {
 
         let promises = [];
         res.Items.forEach(i => {
-            util.logMessage('item =>' + JSON.stringify(i));
             let filename = getFilename(event, i);
 
-            if (!filename) return reject({ status: '#FILENAME_NOTFOUND', message: 'Check your configured keys for this table.' })
+            if (!filename) return reject({
+                status: '#FILENAME_NOTFOUND',
+                message: 'Check your configured keys for this table.'
+            })
 
-            util.logMessage('FILENAME ==> ' + JSON.stringify(filename));
+            //util.logMessage('FILENAME ==> ' + JSON.stringify(filename));
 
             promises.push(searchObjectsToBackup(CONFIG.bucket, `${event.table.name}/${filename}`, i))
         });
@@ -105,7 +117,7 @@ function scanErrors(event, parm, list = [], resolve, reject) {
                         list = list.concat(values);
                     }
 
-                    util.logMessage('LISTA ===> ' + JSON.stringify(list));
+                    //util.logMessage('LISTA ===> ' + JSON.stringify(list),logString);
                     return resolve(list);
                 }
             })
@@ -118,17 +130,21 @@ function searchObjectsToBackup(bucket, key, obj, returnObj = null) {
             Bucket: bucket,
             Key: key
         }).then(res => {
-            util.logMessage('RESPOSTA BUCKET ==> ' + JSON.stringify(res));
             if (res.Body) {
                 res.Body = JSON.parse(res.Body.toString());
-                (_.isEqual(res.Body, obj)) ? null : returnObj = obj;
+                (_.isEqual(res.Body, obj)) ? null: returnObj = obj;
             }
 
-            if (returnObj) resolve(returnObj);
+            if (returnObj) {
+                util.logMessage(key + ' - DIFF', logString);
+                resolve(returnObj);
+            }
+
+            //util.logMessage(key + ' - OK',logString);
             resolve();
 
         }).catch(err => {
-            util.logMessage('ERRO BUCKET ==> ' + JSON.stringify(err));
+            util.logMessage(key + ' - NOT FOUND', logString);
             returnObj = obj;
             resolve(returnObj);
         })
@@ -142,31 +158,44 @@ function putObjects(event) {
         let count = event.objects.length;
         let countSuccess = 0;
         let listErrors = [];
-        if (_.isEmpty(event.objects) || !_.isArray(event.objects)) return reject({ status: '#OBJECTS_NOT_FOUND', message: 'Não há objetos para enviar.' });
+        if (_.isEmpty(event.objects) || !_.isArray(event.objects)) return reject({
+            status: '#OBJECTS_NOT_FOUND',
+            message: 'NOTHING TO DO'
+        });
+
+        util.logMessage('', logString, 1)
 
         event.objects.forEach(obj => {
-            util.logMessage('OBJECT TO PUT ==>' + JSON.stringify(obj))
 
             let filename = getFilename(event, obj);
 
-            if (!filename) return reject({ status: '#FILENAME_NOTFOUND', message: 'Note: Check your configured keys for this table.' })
+            if (!filename) return reject({
+                status: '#FILENAME_NOTFOUND',
+                message: 'Note: Check your configured keys for this table.'
+            })
 
             util.putObject({
-                Bucket: CONFIG.bucket,
-                Key: `${event.table.name}/${filename}`,
-                Body: Buffer.from(JSON.stringify(obj))
-            })
+                    Bucket: CONFIG.bucket,
+                    Key: `${event.table.name}/${filename}`,
+                    Body: Buffer.from(JSON.stringify(obj))
+                })
                 .then(res => {
-                    util.logMessage('PUT SUCCESS ==>' + JSON.stringify(obj));
+                    util.logMessage(`${event.table.name}/${filename} - PUT SUCCESS`, logString);
                     count--;
                     countSuccess++;
-                    if (count == 0) return resolve({ listErrors, countSuccess });
+                    if (count == 0) return resolve({
+                        listErrors,
+                        countSuccess
+                    });
                 })
                 .catch(err => {
-                    util.logMessage('FAILED TO PUT ==>' + JSON.stringify(obj));
+                    util.logMessage(`${event.table.name}/${filename} - PUT FAILED`, logString);
                     listErrors.push(obj);
                     count--;
-                    if (count == 0) return resolve({ listErrors, countSuccess });
+                    if (count == 0) return resolve({
+                        listErrors,
+                        countSuccess
+                    });
                 })
         })
     })
@@ -198,9 +227,6 @@ function getFilename(event, obj) {
 
         let configKeys = _.get(CONFIG, `tables.${event.table.name}`);
 
-        util.logMessage('CONFIG KEYS ==>' + JSON.stringify(configKeys));
-        util.logMessage('EVENT KEYS ==> ' + JSON.stringify(event.table.keys));
-
         if (_.size(configKeys) === 1) {
             if (event.table.keys[0].AttributeName !== configKeys.key) return null;
 
@@ -225,14 +251,13 @@ function getFilename(event, obj) {
 function endRequest(res, event) {
     return new Promise((resolve, reject) => {
         if (!_.isEmpty(res) && event.execute) {
-            util.logMessage('PUT ERRORS ==> ' + JSON.stringify(res.listErrors));
-            util.logMessage('PUT ERRORS LENGTH ==> ' + res.listErrors.length);
-            util.logMessage('PUT SUCCESS LENGTH ==> ' + res.countSuccess);
+            util.logMessage('', logString, 1);
+            util.logMessage('PUT ERRORS LENGTH ==> ' + res.listErrors.length, logString);
+            util.logMessage('PUT SUCCESS LENGTH ==> ' + res.countSuccess, logString);
         } else if (event.execute) {
-            util.logMessage('PUT ERRORS 0');
+            util.logMessage('PUT ERRORS 0', logString);
         }
 
-        util.logMessage('------FINISHED------');
         return resolve();
     })
 }

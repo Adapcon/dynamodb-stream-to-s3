@@ -9,15 +9,6 @@ provider:
   timeout: ${file(./config.json):timeout}
 
 functions:
-  integrityCheck:
-    handler: /handler/integrityCheck.run
-    events:
-      - http:
-          path: integrityCheck
-          method: post
-          integration: lambda
-          cors: true
-
   backupTrigger:
     handler: /handler/trigger.run
     events: ${file(./config.json):streams}

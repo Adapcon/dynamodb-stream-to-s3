@@ -1,6 +1,7 @@
 'use strict';
 const _ = require('lodash');
 const s3 = require('./Aws.js').s3();
+const moment = require('moment');
 
 class Util {
     constructor() { }
@@ -157,7 +158,6 @@ class Util {
     }
 
     sendResultErro(res, callback) {
-        console.log(res);
         try {
             if (_.isUndefined(res.status) || _.isEmpty(res.status)) {
                 this.back('#go0001', 'ERRO', callback);
@@ -171,10 +171,15 @@ class Util {
     /**
      * LOG MESSAGES FORMATTER
      */
-    logMessage(msg) {
-        console.log('=====================');
-        console.log(msg);
-        console.log('=====================');
+    logMessage(message,logString,separator) {
+        
+        if (message) {
+            message = moment().format('DD/MM/YYYY hh:mm:ss') + ' - ' + message
+            console.log(message);
+            logString += '\n' + message;
+        }
+
+        if (separator) console.log('=======================================================');
     }
 
 };
