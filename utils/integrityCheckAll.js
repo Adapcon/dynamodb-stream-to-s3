@@ -1,31 +1,47 @@
 'use strict';
 const CONFIG = require('../config.json');
 const _ = require('lodash');
-const s3 = require('../utils/Aws.js').s3();
-const dbClient = require('../utils/Aws.js').dbClient();
-const db = require('../utils/Aws.js').db();
-const util = require('../utils/Util.js');
+const s3 = require('./Aws.js').s3();
+const dbClient = require('./Aws.js').dbClient();
+const db = require('./Aws.js').db();
+const util = require('./Util.js');
 
 let logString = '';
 
 let event = {};
-event.table = process.argv[2];
-event.execute = process.argv[3];
+event.tables = _.keys(CONFIG.tables);
+event.execute = true;
 
-execute((res) => {
-    util.logMessage('', logString, 1)
-    util.logMessage(res.message, logString, 1)
+execAll(res => {
+    util.logMessage(res, logString, 1);
 })
+
+function execAll(callback) {
+    event.table = event.tables[0];
+
+    execute((res) => {
+
+        util.logMessage('', logString, 1);
+        util.logMessage(`${res.message} - ${event.table.name}`, logString, 1);
+
+        if (_.has(event, 'objects')) event.objects.splice(0);
+        event.tables.splice(0, 1);
+
+        if (_.isEmpty(event.tables)) return callback("FINISHED");
+
+        execAll(callback);
+    })
+}
 
 function execute(callback) {
     util.logMessage('', logString, 1)
-    util.logMessage('INTEGRITY CHECK STARTED', logString, 1)
+    util.logMessage(`INTEGRITY CHECK STARTED - ${event.table}`, logString, 1)
 
     util.checkArgs([{
-            var: event.table,
-            status: '#TABLE_NOTFOUND',
-            message: 'A Tabela do Dynamo não foi informada!'
-        }])
+        var: event.table,
+        status: '#TABLE_NOTFOUND',
+        message: 'DynamoDB TABLE WAS NOT INFORMED'
+    }])
         .then(() => getTableSchema(event))
         .then(() => getInvalidObjects(event))
         .then(() => putObjects(event))
@@ -45,8 +61,8 @@ function getTableSchema(event) {
             TableName: event.table
         }, (err, data) => {
             if (err) return reject({
-                status: "error",
-                message: 'Table not found!'
+                status: 'error',
+                message: 'TABLE NOT FOUND'
             });
             else {
                 event.table = {};
@@ -62,9 +78,9 @@ function getTableSchema(event) {
 function getInvalidObjects(event) {
     return new Promise((resolve, reject) => {
         scan('errors', event, {
-                TableName: event.table.name,
-                Limit: 100
-            })
+            TableName: event.table.name,
+            Limit: 100
+        })
             .then(res => {
                 event.objects = res;
                 return resolve();
@@ -95,8 +111,6 @@ function scanErrors(event, parm, list = [], resolve, reject) {
                 message: 'Check your configured keys for this table.'
             })
 
-            //util.logMessage('FILENAME ==> ' + JSON.stringify(filename));
-
             promises.push(searchObjectsToBackup(CONFIG.bucket, `${event.table.name}/${filename}`, i))
         });
 
@@ -117,7 +131,6 @@ function scanErrors(event, parm, list = [], resolve, reject) {
                         list = list.concat(values);
                     }
 
-                    //util.logMessage('LISTA ===> ' + JSON.stringify(list),logString);
                     return resolve(list);
                 }
             })
@@ -132,7 +145,7 @@ function searchObjectsToBackup(bucket, key, obj, returnObj = null) {
         }).then(res => {
             if (res.Body) {
                 res.Body = JSON.parse(res.Body.toString());
-                (_.isEqual(res.Body, obj)) ? null: returnObj = obj;
+                (_.isEqual(res.Body, obj)) ? null : returnObj = obj;
             }
 
             if (returnObj) {
@@ -140,7 +153,6 @@ function searchObjectsToBackup(bucket, key, obj, returnObj = null) {
                 resolve(returnObj);
             }
 
-            //util.logMessage(key + ' - OK',logString);
             resolve();
 
         }).catch(err => {
@@ -175,10 +187,10 @@ function putObjects(event) {
             })
 
             util.putObject({
-                    Bucket: CONFIG.bucket,
-                    Key: `${event.table.name}/${filename}`,
-                    Body: Buffer.from(JSON.stringify(obj))
-                })
+                Bucket: CONFIG.bucket,
+                Key: `${event.table.name}/${filename}`,
+                Body: Buffer.from(JSON.stringify(obj))
+            })
                 .then(res => {
                     util.logMessage(`${event.table.name}/${filename} - PUT SUCCESS`, logString);
                     count--;
@@ -228,7 +240,7 @@ function getFilename(event, obj) {
         let configKeys = _.get(CONFIG, `tables.${event.table.name}`);
 
         if (_.size(configKeys) === 1) {
-            if (event.table.keys[0].AttributeName !== configKeys.key) return null;
+            if (event.table.keys[0].AttributeName !== configKeys.key || _.size(event.table.keys) > 1) return null;
 
             key = event.table.keys[0].AttributeName;
             filename = obj[key];
