@@ -219,9 +219,9 @@ function getFilename(event, obj) {
         let filename;
         let key;
 
-        if (!_.get(CONFIG, `tables.${event.table.name}`)) return null;
+        if (!_.get(CONFIG, [ 'tables', event.table.name ])) return null;
 
-        let configKeys = _.get(CONFIG, `tables.${event.table.name}`);
+        let configKeys = _.get(CONFIG, ['tables', event.table.name]);
 
         if (_.size(configKeys) === 1) {
             if (event.table.keys[0].AttributeName !== configKeys.key) return null;
