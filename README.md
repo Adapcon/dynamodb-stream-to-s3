@@ -19,7 +19,7 @@ See docs: [here](https://serverless.com/framework/docs/providers/aws/guide/insta
 
 You'll also need to set up your AWS access credentials:
 ```
-serverless config credentials --provider aws --key AKIAIOSFODNN7EXAMPLE --secret wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+serverless config credentials --provider aws --key <access-key> --secret <secret-key>
 ```
 See docs: [here](https://serverless.com/framework/docs/providers/aws/guide/credentials/)
 
