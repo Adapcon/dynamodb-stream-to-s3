@@ -54,6 +54,14 @@ Creating the configuration file (config.json):
             "sortKey": "..."
         },
         ...
+    },
+    "email": {
+        "region": "...",
+        "from": "...",
+        "to": [
+            "...",
+            ...
+        ]
     }
 }
 ```
