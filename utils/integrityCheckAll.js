@@ -4,14 +4,9 @@ const _ = require('lodash');
 const s3 = require('./Aws.js').s3();
 const dbClient = require('./Aws.js').dbClient();
 const db = require('./Aws.js').db();
+const ses = require('./Aws.js').ses();
 const util = require('./Util.js');
-const aws = require('aws-sdk');
 const moment = require('moment');
-
-const ses = new aws.SES({
-    apiVersion: '2010-12-01',
-    region: _.get(CONFIG, 'email.region')
-});
 
 let logString = '';
 
