@@ -164,20 +164,6 @@ class Util {
         }
     }
 
-    /**
-     * LOG MESSAGES FORMATTER
-     */
-    logMessage(message,logString,separator) {
-        
-        if (message) {
-            message = moment().format('DD/MM/YYYY hh:mm:ss') + ' - ' + message
-            console.log(message);
-            logString += '\n' + message;
-        }
-
-        if (separator) console.log('=======================================================');
-    }
-
 };
 
 module.exports = new Util();

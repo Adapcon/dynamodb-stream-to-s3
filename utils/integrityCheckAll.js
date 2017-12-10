@@ -4,7 +4,9 @@ const _ = require('lodash');
 const s3 = require('./Aws.js').s3();
 const dbClient = require('./Aws.js').dbClient();
 const db = require('./Aws.js').db();
+const ses = require('./Aws.js').ses();
 const util = require('./Util.js');
+const moment = require('moment');
 
 let logString = '';
 
@@ -12,14 +14,17 @@ let event = {};
 event.tables = _.keys(CONFIG.tables);
 event.execute = true;
 
-execAll(res => util.logMessage(res, logString, 1));
+execAll(res => {
+    logMessage(res, 1);
+    sendEmail()
+})
 
 function execAll(callback) {
     event.table = event.tables[0];
 
     execute((res) => {
-        util.logMessage('', logString, 1);
-        util.logMessage(`${res.message} - ${event.table.name}`, logString, 1);
+        logMessage('', 1);
+        logMessage(`${res.message} - ${event.table.name}`, 1);
 
         if (_.has(event, 'objects')) event.objects.splice(0);
         event.tables.splice(0, 1);
@@ -31,14 +36,14 @@ function execAll(callback) {
 }
 
 function execute(callback) {
-    util.logMessage('', logString, 1)
-    util.logMessage(`INTEGRITY CHECK STARTED - ${event.table}`, logString, 1)
+    logMessage('', 1)
+    logMessage(`INTEGRITY CHECK STARTED - ${event.table}`, 1)
 
     util.checkArgs([{
-        var: event.table,
-        status: '#TABLE_NOTFOUND',
-        message: 'DynamoDB TABLE WAS NOT INFORMED'
-    }])
+            var: event.table,
+            status: '#TABLE_NOTFOUND',
+            message: 'DynamoDB TABLE WAS NOT INFORMED'
+        }])
         .then(() => getTableSchema(event))
         .then(() => getInvalidObjects(event))
         .then(() => putObjects(event))
@@ -75,9 +80,9 @@ function getTableSchema(event) {
 function getInvalidObjects(event) {
     return new Promise((resolve, reject) => {
         scan('errors', event, {
-            TableName: event.table.name,
-            Limit: 100
-        })
+                TableName: event.table.name,
+                Limit: 100
+            })
             .then(res => {
                 event.objects = res;
                 return resolve();
@@ -142,18 +147,18 @@ function searchObjectsToBackup(bucket, key, obj, returnObj = null) {
         }).then(res => {
             if (res.Body) {
                 res.Body = JSON.parse(res.Body.toString());
-                (_.isEqual(res.Body, obj)) ? null : returnObj = obj;
+                (_.isEqual(res.Body, obj)) ? null: returnObj = obj;
             }
 
             if (returnObj) {
-                util.logMessage(key + ' - DIFF', logString);
+                logMessage(key + ' - DIFF');
                 resolve(returnObj);
             }
 
             resolve();
 
         }).catch(err => {
-            util.logMessage(key + ' - NOT FOUND', logString);
+            logMessage(key + ' - NOT FOUND');
             returnObj = obj;
             resolve(returnObj);
         })
@@ -172,7 +177,7 @@ function putObjects(event) {
             message: 'NOTHING TO DO'
         });
 
-        util.logMessage('', logString, 1)
+        logMessage('', 1)
 
         event.objects.forEach(obj => {
 
@@ -184,12 +189,12 @@ function putObjects(event) {
             })
 
             util.putObject({
-                Bucket: CONFIG.bucket,
-                Key: `${event.table.name}/${filename}`,
-                Body: Buffer.from(JSON.stringify(obj))
-            })
+                    Bucket: CONFIG.bucket,
+                    Key: `${event.table.name}/${filename}`,
+                    Body: Buffer.from(JSON.stringify(obj))
+                })
                 .then(res => {
-                    util.logMessage(`${event.table.name}/${filename} - PUT SUCCESS`, logString);
+                    logMessage(`${event.table.name}/${filename} - PUT SUCCESS`);
                     count--;
                     countSuccess++;
                     if (count == 0) return resolve({
@@ -198,7 +203,7 @@ function putObjects(event) {
                     });
                 })
                 .catch(err => {
-                    util.logMessage(`${event.table.name}/${filename} - PUT FAILED`, logString);
+                    logMessage(`${event.table.name}/${filename} - PUT FAILED`);
                     listErrors.push(obj);
                     count--;
                     if (count == 0) return resolve({
@@ -232,9 +237,9 @@ function getFilename(event, obj) {
         let filename;
         let key;
 
-        if (!_.get(CONFIG, `tables.${event.table.name}`)) return null;
+        if (!_.get(CONFIG, [ 'tables' , event.table.name ])) return null;
 
-        let configKeys = _.get(CONFIG, `tables.${event.table.name}`);
+        let configKeys = _.get(CONFIG, [ 'tables' , event.table.name ]);
 
         if (_.size(configKeys) === 1) {
             if (event.table.keys[0].AttributeName !== configKeys.key || _.size(event.table.keys) > 1) return null;
@@ -260,13 +265,58 @@ function getFilename(event, obj) {
 function endRequest(res, event) {
     return new Promise((resolve, reject) => {
         if (!_.isEmpty(res) && event.execute) {
-            util.logMessage('', logString, 1);
-            util.logMessage('PUT ERRORS LENGTH ==> ' + res.listErrors.length, logString);
-            util.logMessage('PUT SUCCESS LENGTH ==> ' + res.countSuccess, logString);
+            logMessage('', 1);
+            logMessage('PUT ERRORS LENGTH ==> ' + res.listErrors.length);
+            logMessage('PUT SUCCESS LENGTH ==> ' + res.countSuccess);
         } else if (event.execute) {
-            util.logMessage('PUT ERRORS 0', logString);
+            logMessage('PUT ERRORS 0');
         }
 
         return resolve();
     })
+}
+
+function sendEmail() {
+
+    return new Promise((resolve, reject) => {
+
+        if (_.get(CONFIG, 'email')) {
+
+            ses.sendEmail({
+                Destination: {
+                    ToAddresses: _.get(CONFIG, 'email.to')
+                },
+                Message: {
+                    Body: {
+                        Text: {
+                            Data: logString,
+                            Charset: 'utf8'
+                        }
+                    },
+                    Subject: {
+                        Data: 'DynamoDB Stream to S3 - Integrity Check',
+                        Charset: 'utf8'
+                    }
+                },
+                Source: _.get(CONFIG, 'email.from')
+            }, (err, data) => {
+                if (err) return reject(new Error(err));
+                return resolve();
+            })
+        }
+    });
+}
+
+function logMessage(message, separator) {
+
+    if (message) {
+        message = moment().format('DD/MM/YYYY hh:mm:ss') + ' - ' + message
+        console.log(message);
+        logString += '\n' + message;
+    }
+
+    if (separator) {
+        console.log('=======================================================');
+        logString += '\n' + '=======================================================';
+    }
 }

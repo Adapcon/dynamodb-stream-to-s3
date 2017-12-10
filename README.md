@@ -54,6 +54,14 @@ Creating the configuration file (config.json):
             "sortKey": "..."
         },
         ...
+    },
+    "email": {
+        "region": "...",
+        "from": "...",
+        "to": [
+            "...",
+            ...
+        ]
     }
 }
 ```
@@ -66,7 +74,7 @@ sls deploy
 ```
 See docs: [here](https://serverless.com/framework/docs/providers/aws/guide/deploying/)
 
-The serverless framework will create in the IAM a role named: adapcon-dynamodb-stream-to-s3-core-{your region}-lambdaRole.
+The serverless framework will create in the IAM a role named: dynamodb-stream-to-s3-core-{your region}-lambdaRole.
 You need attach the "AmazonS3FullAccess" and "AmazonDynamoDBFullAccess" policies.
 
 Done, changes that occur in the existing tables in the configuration file will be replicated in the configured bucket.

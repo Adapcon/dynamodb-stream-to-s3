@@ -1,10 +1,11 @@
 'use strict';
 const aws = require('aws-sdk');
+const _ = require('lodash');
 const CONFIG = require('../config.json');
 
 class Aws {
     constructor() {
-        aws.config.update({ region: CONFIG.region });
+        aws.config.update({ region: _.get(CONFIG, 'region') });
     }
 
     dbClient() {
@@ -17,6 +18,13 @@ class Aws {
 
     s3() {
         return new aws.S3();
+    }
+
+    ses() {
+        return new aws.SES({
+            apiVersion: '2010-12-01',
+            region: _.get(CONFIG, 'email.region')
+        });
     }
 }
 

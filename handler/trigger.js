@@ -6,9 +6,9 @@ const util = require('../utils/Util.js');
 const unmarshalItem = require('dynamodb-marshaler').unmarshalItem;
 
 module.exports.run = (event, context, callback) => {
-  util.logMessage('-----------TRIGGER START-----------')
-  util.logMessage('--------------EVENT----------------')
-  util.logMessage(JSON.stringify(event))
+  console.log('-----------TRIGGER START-----------')
+  console.log('--------------EVENT----------------')
+  console.log(JSON.stringify(event))
 
   getTable(event)
     .then(() => getRecords(event))
@@ -30,7 +30,7 @@ function getTable(event) {
     event.table = event.table.split(':table/')[1];
     event.table = event.table.split('/')[0];
 
-    util.logMessage('EVENT TABLE ==> ' + event.table);
+    console.log('EVENT TABLE ==> ' + event.table);
 
     if (event.table) return resolve();
     return reject({ status: '#ERROR_GET_TABLE' })
@@ -51,8 +51,8 @@ function getRecords(event) {
         let configKeys = _.get(CONFIG, `tables.${event.table}`);
         let streamKeys = _.keys(record.dynamodb.Keys);
 
-        util.logMessage('KEYS => ' + JSON.stringify(configKeys));
-        util.logMessage('STREAM KEYS => ' + JSON.stringify(streamKeys));
+        console.log('KEYS => ' + JSON.stringify(configKeys));
+        console.log('STREAM KEYS => ' + JSON.stringify(streamKeys));
         
         if (_.size(configKeys) === 2) {
           let key = configKeys.key;
@@ -75,11 +75,11 @@ function getRecords(event) {
         }
       } else return reject({ status: '#KEYS_NOT_FOUND' })
 
-      util.logMessage('EVENTNAME => ' + record.eventName);
+      console.log('EVENTNAME => ' + record.eventName);
 
       filename = filename.replace(/[^a-z0-9 | . _ - @]/gi, '-');
 
-      util.logMessage('FILENAME => ' + filename);
+      console.log('FILENAME => ' + filename);
 
       if (record.eventName == 'REMOVE' && filename) {
         event.objects.push({
@@ -99,7 +99,7 @@ function getRecords(event) {
             Body: Buffer.from(JSON.stringify(record.dynamodb.NewImage))
           }
         })
-        util.logMessage('NEWIMAGE => ' + JSON.stringify(record.dynamodb.NewImage));
+        console.log('NEWIMAGE => ' + JSON.stringify(record.dynamodb.NewImage));
       }
       count--;
     })
@@ -113,29 +113,29 @@ function setRecords(event) {
     let count = event.objects.length;
     event.objects.forEach(record => {
       if (_.has(record, 'putFile')) {
-        util.logMessage('RECORD TO PUT ==>' + JSON.stringify(record))
+        console.log('RECORD TO PUT ==>' + JSON.stringify(record))
         util.putObject(record.putFile)
           .then(res => {
-            util.logMessage('PUT SUCCESS ==>' + JSON.stringify(record))
+            console.log('PUT SUCCESS ==>' + JSON.stringify(record))
             count--;
             if (count == 0) return resolve();
           })
           .catch(err => {
-            util.logMessage('FAILED TO PUT ==>' + JSON.stringify(record))
+            console.log('FAILED TO PUT ==>' + JSON.stringify(record))
             count--;
             if (count == 0) return resolve();
           })
       } else if (_.has(record, 'excludeFile')) {
-        util.logMessage('RECORD TO REMOVE ==>' + JSON.stringify(record))
+        console.log('RECORD TO REMOVE ==>' + JSON.stringify(record))
 
         util.deleteObject(record.excludeFile)
           .then(res => {
-            util.logMessage('REMOVED ==>' + JSON.stringify(record))
+            console.log('REMOVED ==>' + JSON.stringify(record))
             count--;
             if (count == 0) return resolve();
           })
           .catch(err => {
-            util.logMessage('FAILED TO REMOVE ==>' + JSON.stringify(record))
+            console.log('FAILED TO REMOVE ==>' + JSON.stringify(record))
             console.log('ERROR ==>', err);
             count--;
             if (count == 0) return resolve();
