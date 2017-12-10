@@ -12,15 +12,12 @@ let event = {};
 event.tables = _.keys(CONFIG.tables);
 event.execute = true;
 
-execAll(res => {
-    util.logMessage(res, logString, 1);
-})
+execAll(res => util.logMessage(res, logString, 1));
 
 function execAll(callback) {
     event.table = event.tables[0];
 
     execute((res) => {
-
         util.logMessage('', logString, 1);
         util.logMessage(`${res.message} - ${event.table.name}`, logString, 1);
 
