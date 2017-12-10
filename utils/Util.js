@@ -135,9 +135,7 @@ class Util {
      * CHECK IF THE ARGUMENT EXISTS
      */
     isEmpty(arg) {
-		if (_.isUndefined(arg) || _.isEmpty(arg) || arg == 'undefined' || arg == undefined) {
-			return true;
-		}
+		if (_.isUndefined(arg) || _.isEmpty(arg) || arg == 'undefined' || arg == undefined) return true;
 		return false;
 	}
 	/**
@@ -159,9 +157,7 @@ class Util {
 
     sendResultErro(res, callback) {
         try {
-            if (_.isUndefined(res.status) || _.isEmpty(res.status)) {
-                this.back('#go0001', 'ERRO', callback);
-            }
+            if (_.isUndefined(res.status) || _.isEmpty(res.status)) this.back('#go0001', 'ERRO', callback);
             this.back(res.status, res.message, callback);
         } catch (err) {
             this.back(res.status, res.message, callback);

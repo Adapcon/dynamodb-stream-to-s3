@@ -23,7 +23,6 @@ function execAll(callback) {
     event.table = event.tables[0];
 
     execute((res) => {
-
         logMessage('', 1);
         logMessage(`${res.message} - ${event.table.name}`, 1);
 
