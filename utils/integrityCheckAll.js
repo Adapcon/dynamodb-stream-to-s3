@@ -2,7 +2,7 @@
 const CONFIG = require('../config.json');
 const _ = require('lodash');
 const ses = require('./Aws.js').ses();
-const execute = require('./execIntegrityCheck');
+const execute = require('./integrityCheck');
 const moment = require('moment');
 
 let event = {};
