@@ -15,8 +15,8 @@ class Util {
                     let ret = {};
                     if (!_.has(item, 'var')) {
                         reject({
-                            status: '#go0001',
-                            message: 'A propriedade Var não foi passada para o sistema que gerencia os dados enviados para API.'
+                            status: '#VAR_NOT_FOUND',
+                            message: ''
                         });
                     }
 
@@ -71,14 +71,14 @@ class Util {
                 } catch (err) {
                     console.log(err);
                     reject({
-                        status: '#go0001',
-                        message: 'Ocorreu um erro ao verificar os dados enviados para a API.'
+                        status: '#ERROR_CHECK_ARGS',
+                        message: ''
                     });
                 }
             });
             resolve({
                 status: 200,
-                message: 'Todos os argumentos passados para o processo estão OK!'
+                message: ''
             });
         });
     }
@@ -90,7 +90,7 @@ class Util {
         return new Promise((resolve, reject) => {
             if (!parm) return reject({
                 status: '#PUTOBJECT_PARM_NOTFOUND',
-                message: 'Os parâmetros para inserir arquivos no S3 não foram passados.'
+                message: 'Parameters for put files in S3 have not been passed.'
             })
             s3.putObject(parm, (err, data) => {
                 if (err) return reject(err);
@@ -106,7 +106,7 @@ class Util {
         return new Promise((resolve, reject) => {
             if (!parm) return reject({
                 status: '#DELETEOBJECT_PARM_NOTFOUND',
-                message: 'Os parâmetros para remover arquivos do S3 não foram passados.'
+                message: 'Parameters for removing files of S3 have not been passed.'
             })
             s3.deleteObject(parm, (err, data) => {
                 if (err) return reject(err);
@@ -122,7 +122,7 @@ class Util {
         return new Promise((resolve, reject) => {
             if (!parm) return reject({
                 status: '#GETOBJECT_PARM_NOTFOUND',
-                message: 'Os parâmetros para buscar arquivos do S3 não foram passados.'
+                message: 'Parameters to get files of S3 have not been passed.'
             })
             s3.getObject(parm, (err, data) => {
                 if (err) return reject(err);
@@ -160,7 +160,7 @@ class Util {
     sendResultErro(res, callback) {
         try {
             if (_.isUndefined(res.status) || _.isEmpty(res.status)) {
-                this.back('#go0001', 'ERRO', callback);
+                this.back('#ERROR', 'ERRO', callback);
             }
             this.back(res.status, res.message, callback);
         } catch (err) {
